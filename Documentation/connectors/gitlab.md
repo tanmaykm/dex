@@ -36,4 +36,11 @@ connectors:
       # flag which will switch from using the internal GitLab id to the users handle (@mention) as the user id.
       # It is possible for a user to change their own user name but it is very rare for them to do so
       useLoginAsID: false
+
+      # Optional additional scopes to request.
+      # These are normally not required. But useful for applications that are more tightly integrated with Dex internals
+      # and would want to reuse the same access token that Dex obtained for additional purposes.
+      # additionalScopes:
+      # - read_api
+      # - read_repository
 ```

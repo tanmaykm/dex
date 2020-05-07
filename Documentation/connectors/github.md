@@ -70,6 +70,13 @@ connectors:
     # flag which will switch from using the internal GitHub id to the users handle (@mention) as the user id.
     # It is possible for a user to change their own user name but it is very rare for them to do so
     useLoginAsID: false
+
+    # Optional additional scopes to request.
+    # These are normally not required. But useful for applications that are more tightly integrated with Dex internals
+    # and would want to reuse the same access token that Dex obtained for additional purposes.
+    # additionalScopes:
+    # - notifications
+    # - read:public_key
 ```
 
 ## GitHub Enterprise
@@ -120,6 +127,13 @@ connectors:
     # ONLY for GitHub Enterprise. Optional field.
     # Used to support self-signed or untrusted CA root certificates.
     rootCA: /etc/dex/ca.crt
+
+    # Optional additional scopes to request.
+    # These are normally not required. But useful for applications that are more tightly integrated with Dex internals
+    # and would want to reuse the same access token that Dex obtained for additional purposes.
+    # additionalScopes:
+    # - notifications
+    # - read:public_key
 ```
 
 [github-oauth2]: https://github.com/settings/applications/new

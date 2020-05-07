@@ -40,16 +40,17 @@ var reLast = regexp.MustCompile("<([^>]+)>; rel=\"last\"")
 
 // Config holds configuration options for github logins.
 type Config struct {
-	ClientID      string `json:"clientID"`
-	ClientSecret  string `json:"clientSecret"`
-	RedirectURI   string `json:"redirectURI"`
-	Org           string `json:"org"`
-	Orgs          []Org  `json:"orgs"`
-	HostName      string `json:"hostName"`
-	RootCA        string `json:"rootCA"`
-	TeamNameField string `json:"teamNameField"`
-	LoadAllGroups bool   `json:"loadAllGroups"`
-	UseLoginAsID  bool   `json:"useLoginAsID"`
+	ClientID         string   `json:"clientID"`
+	ClientSecret     string   `json:"clientSecret"`
+	RedirectURI      string   `json:"redirectURI"`
+	Org              string   `json:"org"`
+	Orgs             []Org    `json:"orgs"`
+	HostName         string   `json:"hostName"`
+	RootCA           string   `json:"rootCA"`
+	TeamNameField    string   `json:"teamNameField"`
+	LoadAllGroups    bool     `json:"loadAllGroups"`
+	UseLoginAsID     bool     `json:"useLoginAsID"`
+	AdditionalScopes []string `json:"additionalScopes,omitempty"`
 }
 
 // Org holds org-team filters, in which teams are optional.
@@ -84,6 +85,7 @@ func (c *Config) Open(id string, logger log.Logger) (connector.Connector, error)
 		apiURL:       apiURL,
 		logger:       logger,
 		useLoginAsID: c.UseLoginAsID,
+		additionalScopes: c.AdditionalScopes,
 	}
 
 	if c.HostName != "" {
@@ -150,6 +152,8 @@ type githubConnector struct {
 	loadAllGroups bool
 	// if set to true will use the user's handle rather than their numeric id as the ID
 	useLoginAsID bool
+	// optional scopes to be requested apart from what the connector itself needs
+	additionalScopes []string
 }
 
 // groupsRequired returns whether dex requires GitHub's 'read:org' scope. Dex
@@ -165,6 +169,10 @@ func (c *githubConnector) oauth2Config(scopes connector.Scopes) *oauth2.Config {
 	githubScopes := []string{scopeEmail}
 	if c.groupsRequired(scopes.Groups) {
 		githubScopes = append(githubScopes, scopeOrgs)
+	}
+	if len(c.additionalScopes) > 0 {
+		c.logger.Warnf("github: requesting additional scopes %v", c.additionalScopes)
+		githubScopes = append(githubScopes, c.additionalScopes...)
 	}
 
 	endpoint := github.Endpoint

@@ -27,12 +27,13 @@ const (
 
 // Config holds configuration options for gitlab logins.
 type Config struct {
-	BaseURL      string   `json:"baseURL"`
-	ClientID     string   `json:"clientID"`
-	ClientSecret string   `json:"clientSecret"`
-	RedirectURI  string   `json:"redirectURI"`
-	Groups       []string `json:"groups"`
-	UseLoginAsID bool     `json:"useLoginAsID"`
+	BaseURL          string   `json:"baseURL"`
+	ClientID         string   `json:"clientID"`
+	ClientSecret     string   `json:"clientSecret"`
+	RedirectURI      string   `json:"redirectURI"`
+	Groups           []string `json:"groups"`
+	UseLoginAsID     bool     `json:"useLoginAsID"`
+	AdditionalScopes []string `json:"additionalScopes,omitempty"`
 }
 
 type gitlabUser struct {
@@ -57,6 +58,7 @@ func (c *Config) Open(id string, logger log.Logger) (connector.Connector, error)
 		logger:       logger,
 		groups:       c.Groups,
 		useLoginAsID: c.UseLoginAsID,
+		additionalScopes: c.AdditionalScopes,
 	}, nil
 }
 
@@ -80,12 +82,18 @@ type gitlabConnector struct {
 	httpClient   *http.Client
 	// if set to true will use the user's handle rather than their numeric id as the ID
 	useLoginAsID bool
+	// optional scopes to be requested apart from what the connector itself needs
+	additionalScopes []string
 }
 
 func (c *gitlabConnector) oauth2Config(scopes connector.Scopes) *oauth2.Config {
 	gitlabScopes := []string{scopeUser}
 	if c.groupsRequired(scopes.Groups) {
 		gitlabScopes = []string{scopeUser, scopeOpenID}
+	}
+	if len(c.additionalScopes) > 0 {
+		c.logger.Warnf("gitlab: requesting additional scopes %v", c.additionalScopes)
+		gitlabScopes = append(gitlabScopes, c.additionalScopes...)
 	}
 
 	gitlabEndpoint := oauth2.Endpoint{AuthURL: c.baseURL + "/oauth/authorize", TokenURL: c.baseURL + "/oauth/token"}
