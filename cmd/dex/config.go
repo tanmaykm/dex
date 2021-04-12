@@ -48,6 +48,8 @@ type Config struct {
 	// querying the storage. Cannot be specified without enabling a passwords
 	// database.
 	StaticPasswords []password `json:"staticPasswords"`
+
+	EnableMultiRefreshTokens bool `json:"enableMultiRefreshTokens"`
 }
 
 // Validate the configuration
@@ -304,6 +306,9 @@ type Expiry struct {
 
 	// DeviceRequests defines the duration of time for which the DeviceRequests will be valid.
 	DeviceRequests string `json:"deviceRequests"`
+
+	// RefreshTokens defines the duration of time for which an unused RefreshToken will be valid
+	RefreshTokens string `json:"refreshTokens"`
 }
 
 // Logger holds configuration required to customize logging for dex.

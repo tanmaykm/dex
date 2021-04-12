@@ -259,18 +259,19 @@ func runServe(options serveOptions) error {
 	healthChecker := gosundheit.New()
 
 	serverConfig := server.Config{
-		SupportedResponseTypes: c.OAuth2.ResponseTypes,
-		SkipApprovalScreen:     c.OAuth2.SkipApprovalScreen,
-		AlwaysShowLoginScreen:  c.OAuth2.AlwaysShowLoginScreen,
-		PasswordConnector:      c.OAuth2.PasswordConnector,
-		AllowedOrigins:         c.Web.AllowedOrigins,
-		Issuer:                 c.Issuer,
-		Storage:                s,
-		Web:                    c.Frontend,
-		Logger:                 logger,
-		Now:                    now,
-		PrometheusRegistry:     prometheusRegistry,
-		HealthChecker:          healthChecker,
+		SupportedResponseTypes:   c.OAuth2.ResponseTypes,
+		SkipApprovalScreen:       c.OAuth2.SkipApprovalScreen,
+		AlwaysShowLoginScreen:    c.OAuth2.AlwaysShowLoginScreen,
+		PasswordConnector:        c.OAuth2.PasswordConnector,
+		AllowedOrigins:           c.Web.AllowedOrigins,
+		Issuer:                   c.Issuer,
+		Storage:                  s,
+		Web:                      c.Frontend,
+		Logger:                   logger,
+		Now:                      now,
+		PrometheusRegistry:       prometheusRegistry,
+		HealthChecker:            healthChecker,
+		EnableMultiRefreshTokens: c.EnableMultiRefreshTokens,
 	}
 	if c.Expiry.SigningKeys != "" {
 		signingKeys, err := time.ParseDuration(c.Expiry.SigningKeys)
@@ -303,6 +304,14 @@ func runServe(options serveOptions) error {
 		}
 		logger.Infof("config device requests valid for: %v", deviceRequests)
 		serverConfig.DeviceRequestsValidFor = deviceRequests
+	}
+	if c.Expiry.RefreshTokens != "" {
+		refreshTokens, err := time.ParseDuration(c.Expiry.RefreshTokens)
+		if err != nil {
+			return fmt.Errorf("invalid config value %q for refresh tokens expiry: %v", c.Expiry.RefreshTokens, err)
+		}
+		logger.Infof("config device requests valid for: %v", refreshTokens)
+		serverConfig.UnusedRefreshTokensValidFor = refreshTokens
 	}
 	serv, err := server.NewServer(context.Background(), serverConfig)
 	if err != nil {
@@ -437,7 +446,7 @@ func runServe(options serveOptions) error {
 		}
 
 		grpcSrv := grpc.NewServer(grpcOptions...)
-		api.RegisterDexServer(grpcSrv, server.NewAPI(serverConfig.Storage, logger))
+		api.RegisterDexServer(grpcSrv, server.NewAPI(serverConfig.Storage, logger, c.EnableMultiRefreshTokens))
 
 		grpcMetrics.InitializeMetrics(grpcSrv)
 		if c.GRPC.Reflection {

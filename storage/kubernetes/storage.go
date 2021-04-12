@@ -590,7 +590,7 @@ func (cli *client) UpdateConnector(id string, updater func(a storage.Connector) 
 	})
 }
 
-func (cli *client) GarbageCollect(now time.Time) (result storage.GCResult, err error) {
+func (cli *client) GarbageCollect(now time.Time, unusedRefreshTokensValidFor time.Duration) (result storage.GCResult, err error) {
 	var authRequests AuthRequestList
 	if err := cli.list(resourceAuthRequest, &authRequests); err != nil {
 		return result, fmt.Errorf("failed to list auth requests: %v", err)

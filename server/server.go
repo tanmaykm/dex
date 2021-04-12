@@ -77,10 +77,11 @@ type Config struct {
 	// If enabled, the connectors selection page will always be shown even if there's only one
 	AlwaysShowLoginScreen bool
 
-	RotateKeysAfter        time.Duration // Defaults to 6 hours.
-	IDTokensValidFor       time.Duration // Defaults to 24 hours
-	AuthRequestsValidFor   time.Duration // Defaults to 24 hours
-	DeviceRequestsValidFor time.Duration // Defaults to 5 minutes
+	RotateKeysAfter             time.Duration // Defaults to 6 hours.
+	IDTokensValidFor            time.Duration // Defaults to 24 hours
+	AuthRequestsValidFor        time.Duration // Defaults to 24 hours
+	DeviceRequestsValidFor      time.Duration // Defaults to 5 minutes
+	UnusedRefreshTokensValidFor time.Duration // Defaults to 30 days
 	// If set, the server will use this connector to handle password grants
 	PasswordConnector string
 
@@ -96,6 +97,8 @@ type Config struct {
 	PrometheusRegistry *prometheus.Registry
 
 	HealthChecker gosundheit.Health
+
+	EnableMultiRefreshTokens bool
 }
 
 // WebConfig holds the server's frontend templates and asset configuration.
@@ -163,6 +166,8 @@ type Server struct {
 	deviceRequestsValidFor time.Duration
 
 	logger log.Logger
+
+	enableMultiRefreshTokens bool
 }
 
 // NewServer constructs a server from the provided config.
@@ -223,19 +228,20 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	}
 
 	s := &Server{
-		issuerURL:              *issuerURL,
-		connectors:             make(map[string]Connector),
-		storage:                newKeyCacher(c.Storage, now),
-		supportedResponseTypes: supported,
-		idTokensValidFor:       value(c.IDTokensValidFor, 24*time.Hour),
-		authRequestsValidFor:   value(c.AuthRequestsValidFor, 24*time.Hour),
-		deviceRequestsValidFor: value(c.DeviceRequestsValidFor, 5*time.Minute),
-		skipApproval:           c.SkipApprovalScreen,
-		alwaysShowLogin:        c.AlwaysShowLoginScreen,
-		now:                    now,
-		templates:              tmpls,
-		passwordConnector:      c.PasswordConnector,
-		logger:                 c.Logger,
+		issuerURL:                *issuerURL,
+		connectors:               make(map[string]Connector),
+		storage:                  newKeyCacher(c.Storage, now),
+		supportedResponseTypes:   supported,
+		idTokensValidFor:         value(c.IDTokensValidFor, 24*time.Hour),
+		authRequestsValidFor:     value(c.AuthRequestsValidFor, 24*time.Hour),
+		deviceRequestsValidFor:   value(c.DeviceRequestsValidFor, 5*time.Minute),
+		skipApproval:             c.SkipApprovalScreen,
+		alwaysShowLogin:          c.AlwaysShowLoginScreen,
+		now:                      now,
+		templates:                tmpls,
+		passwordConnector:        c.PasswordConnector,
+		logger:                   c.Logger,
+		enableMultiRefreshTokens: c.EnableMultiRefreshTokens,
 	}
 
 	// Retrieves connector objects in backend storage. This list includes the static connectors
@@ -348,7 +354,7 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	s.mux = r
 
 	s.startKeyRotation(ctx, rotationStrategy, now)
-	s.startGarbageCollection(ctx, value(c.GCFrequency, 5*time.Minute), now)
+	s.startGarbageCollection(ctx, value(c.GCFrequency, 5*time.Minute), value(c.UnusedRefreshTokensValidFor, 720*time.Hour), now)
 
 	return s, nil
 }
@@ -466,18 +472,18 @@ func (k *keyCacher) GetKeys() (storage.Keys, error) {
 	return storageKeys, nil
 }
 
-func (s *Server) startGarbageCollection(ctx context.Context, frequency time.Duration, now func() time.Time) {
+func (s *Server) startGarbageCollection(ctx context.Context, frequency time.Duration, unusedRefreshTokensValidFor time.Duration, now func() time.Time) {
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(frequency):
-				if r, err := s.storage.GarbageCollect(now()); err != nil {
+				if r, err := s.storage.GarbageCollect(now(), unusedRefreshTokensValidFor); err != nil {
 					s.logger.Errorf("garbage collection failed: %v", err)
 				} else if !r.IsEmpty() {
-					s.logger.Infof("garbage collection run, delete auth requests=%d, auth codes=%d, device requests=%d, device tokens=%d",
-						r.AuthRequests, r.AuthCodes, r.DeviceRequests, r.DeviceTokens)
+					s.logger.Infof("garbage collection run, delete auth requests=%d, auth codes=%d, device requests=%d, device tokens=%d, refresh tokens=%d",
+						r.AuthRequests, r.AuthCodes, r.DeviceRequests, r.DeviceTokens, r.RefreshTokens)
 				}
 			}
 		}

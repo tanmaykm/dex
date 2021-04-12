@@ -84,7 +84,7 @@ type scanner interface {
 	Scan(dest ...interface{}) error
 }
 
-func (c *conn) GarbageCollect(now time.Time) (storage.GCResult, error) {
+func (c *conn) GarbageCollect(now time.Time, unusedRefreshTokensValidFor time.Duration) (storage.GCResult, error) {
 	result := storage.GCResult{}
 
 	r, err := c.Exec(`delete from auth_request where expiry < $1`, now)
@@ -117,6 +117,15 @@ func (c *conn) GarbageCollect(now time.Time) (storage.GCResult, error) {
 	}
 	if n, err := r.RowsAffected(); err == nil {
 		result.DeviceTokens = n
+	}
+
+	stale_refresh_token_cutoff := now.Add(-unusedRefreshTokensValidFor)
+	r, err = c.Exec(`delete from refresh_token where last_used < $1`, stale_refresh_token_cutoff)
+	if err != nil {
+		return result, fmt.Errorf("gc refresh_token: %v", err)
+	}
+	if n, err := r.RowsAffected(); err == nil {
+		result.RefreshTokens = n
 	}
 
 	return result, err

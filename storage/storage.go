@@ -53,6 +53,7 @@ type GCResult struct {
 	AuthCodes      int64
 	DeviceRequests int64
 	DeviceTokens   int64
+	RefreshTokens  int64
 }
 
 // IsEmpty returns whether the garbage collection result is empty or not.
@@ -60,7 +61,8 @@ func (g *GCResult) IsEmpty() bool {
 	return g.AuthRequests == 0 &&
 		g.AuthCodes == 0 &&
 		g.DeviceRequests == 0 &&
-		g.DeviceTokens == 0
+		g.DeviceTokens == 0 &&
+		g.RefreshTokens == 0
 }
 
 // Storage is the storage interface used by the server. Implementations are
@@ -131,8 +133,8 @@ type Storage interface {
 	UpdateDeviceToken(deviceCode string, updater func(t DeviceToken) (DeviceToken, error)) error
 
 	// GarbageCollect deletes all expired AuthCodes,
-	// AuthRequests, DeviceRequests, and DeviceTokens.
-	GarbageCollect(now time.Time) (GCResult, error)
+	// AuthRequests, DeviceRequests, DeviceTokens and RefreshTokens
+	GarbageCollect(now time.Time, unusedRefreshTokensValidFor time.Duration) (GCResult, error)
 }
 
 // Client represents an OAuth2 client.

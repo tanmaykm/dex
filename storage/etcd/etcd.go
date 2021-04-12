@@ -38,7 +38,7 @@ func (c *conn) Close() error {
 	return c.db.Close()
 }
 
-func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error) {
+func (c *conn) GarbageCollect(now time.Time, unusedRefreshTokensValidFor time.Duration) (result storage.GCResult, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
 	defer cancel()
 	authRequests, err := c.listAuthRequests(ctx)

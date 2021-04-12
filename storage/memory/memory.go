@@ -69,7 +69,7 @@ func (s *memStorage) tx(f func()) {
 
 func (s *memStorage) Close() error { return nil }
 
-func (s *memStorage) GarbageCollect(now time.Time) (result storage.GCResult, err error) {
+func (s *memStorage) GarbageCollect(now time.Time, unusedRefreshTokensValidFor time.Duration) (result storage.GCResult, err error) {
 	s.tx(func() {
 		for id, a := range s.authCodes {
 			if now.After(a.Expiry) {
@@ -93,6 +93,13 @@ func (s *memStorage) GarbageCollect(now time.Time) (result storage.GCResult, err
 			if now.After(a.Expiry) {
 				delete(s.deviceTokens, id)
 				result.DeviceTokens++
+			}
+		}
+		stale_refresh_token_cutoff := now.Add(-unusedRefreshTokensValidFor)
+		for id, a := range s.refreshTokens {
+			if stale_refresh_token_cutoff.After(a.LastUsed) {
+				delete(s.refreshTokens, id)
+				result.RefreshTokens++
 			}
 		}
 	})

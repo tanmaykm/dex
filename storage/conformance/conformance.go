@@ -771,8 +771,10 @@ func testGC(t *testing.T, s storage.Storage) {
 		t.Fatalf("failed creating auth code: %v", err)
 	}
 
+	refreshTokensValidFor, err := time.ParseDuration("720h")
+
 	for _, tz := range []*time.Location{time.UTC, est, pst} {
-		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz))
+		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz), refreshTokensValidFor)
 		if err != nil {
 			t.Errorf("garbage collection failed: %v", err)
 		} else if result.AuthCodes != 0 || result.AuthRequests != 0 {
@@ -783,7 +785,7 @@ func testGC(t *testing.T, s storage.Storage) {
 		}
 	}
 
-	if r, err := s.GarbageCollect(expiry.Add(time.Hour)); err != nil {
+	if r, err := s.GarbageCollect(expiry.Add(time.Hour), refreshTokensValidFor); err != nil {
 		t.Errorf("garbage collection failed: %v", err)
 	} else if r.AuthCodes != 1 {
 		t.Errorf("expected to garbage collect 1 objects, got %d", r.AuthCodes)
@@ -822,7 +824,7 @@ func testGC(t *testing.T, s storage.Storage) {
 	}
 
 	for _, tz := range []*time.Location{time.UTC, est, pst} {
-		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz))
+		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz), refreshTokensValidFor)
 		if err != nil {
 			t.Errorf("garbage collection failed: %v", err)
 		} else if result.AuthCodes != 0 || result.AuthRequests != 0 {
@@ -833,7 +835,7 @@ func testGC(t *testing.T, s storage.Storage) {
 		}
 	}
 
-	if r, err := s.GarbageCollect(expiry.Add(time.Hour)); err != nil {
+	if r, err := s.GarbageCollect(expiry.Add(time.Hour), refreshTokensValidFor); err != nil {
 		t.Errorf("garbage collection failed: %v", err)
 	} else if r.AuthRequests != 1 {
 		t.Errorf("expected to garbage collect 1 objects, got %d", r.AuthRequests)
@@ -859,7 +861,7 @@ func testGC(t *testing.T, s storage.Storage) {
 	}
 
 	for _, tz := range []*time.Location{time.UTC, est, pst} {
-		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz))
+		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz), refreshTokensValidFor)
 		if err != nil {
 			t.Errorf("garbage collection failed: %v", err)
 		} else if result.DeviceRequests != 0 {
@@ -869,7 +871,7 @@ func testGC(t *testing.T, s storage.Storage) {
 			t.Errorf("expected to be able to get auth request after GC: %v", err)
 		}
 	}
-	if r, err := s.GarbageCollect(expiry.Add(time.Hour)); err != nil {
+	if r, err := s.GarbageCollect(expiry.Add(time.Hour), refreshTokensValidFor); err != nil {
 		t.Errorf("garbage collection failed: %v", err)
 	} else if r.DeviceRequests != 1 {
 		t.Errorf("expected to garbage collect 1 device request, got %d", r.DeviceRequests)
@@ -895,7 +897,7 @@ func testGC(t *testing.T, s storage.Storage) {
 	}
 
 	for _, tz := range []*time.Location{time.UTC, est, pst} {
-		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz))
+		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz), refreshTokensValidFor)
 		if err != nil {
 			t.Errorf("garbage collection failed: %v", err)
 		} else if result.DeviceTokens != 0 {
@@ -905,7 +907,7 @@ func testGC(t *testing.T, s storage.Storage) {
 			t.Errorf("expected to be able to get device token after GC: %v", err)
 		}
 	}
-	if r, err := s.GarbageCollect(expiry.Add(time.Hour)); err != nil {
+	if r, err := s.GarbageCollect(expiry.Add(time.Hour), refreshTokensValidFor); err != nil {
 		t.Errorf("garbage collection failed: %v", err)
 	} else if r.DeviceTokens != 1 {
 		t.Errorf("expected to garbage collect 1 device token, got %d", r.DeviceTokens)
