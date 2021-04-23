@@ -119,13 +119,24 @@ func (c *conn) GarbageCollect(now time.Time, unusedRefreshTokensValidFor time.Du
 		result.DeviceTokens = n
 	}
 
-	stale_refresh_token_cutoff := now.Add(-unusedRefreshTokensValidFor)
-	r, err = c.Exec(`delete from refresh_token where last_used < $1`, stale_refresh_token_cutoff)
+	staleRefreshTokenCutoff := now.Add(-unusedRefreshTokensValidFor)
+	staleRefreshTokens, err := c.ListStaleRefreshTokens(staleRefreshTokenCutoff)
 	if err != nil {
 		return result, fmt.Errorf("gc refresh_token: %v", err)
 	}
-	if n, err := r.RowsAffected(); err == nil {
-		result.RefreshTokens = n
+	for _, t := range staleRefreshTokens {
+		// do not delete if this is the primary refresh token linked to offline session
+		o, err := c.GetOfflineSessions(t.Claims.UserID, t.ConnectorID)
+		if err != nil {
+			c.logger.Errorf("failed to fetch offline session for user_id %v, connector_id %v: %v", t.Claims.UserID, t.ConnectorID, err)
+		} else {
+			if o.Refresh[t.ClientID].ID == t.ID {
+				c.logger.Debugf("not deleting expired primary refresh token")
+			} else {
+				c.DeleteRefresh(t.ID)
+				result.RefreshTokens++
+			}
+		}
 	}
 
 	return result, err
@@ -372,6 +383,35 @@ func getRefresh(q querier, id string) (storage.RefreshToken, error) {
 			token, created_at, last_used
 		from refresh_token where id = $1;
 	`, id))
+}
+
+func (c *conn) ListStaleRefreshTokens(lastUsedTime time.Time) ([]storage.RefreshToken, error) {
+	rows, err := c.Query(`
+		select
+			id, client_id, scopes, nonce,
+			claims_user_id, claims_username, claims_preferred_username,
+			claims_email, claims_email_verified, claims_groups,
+			connector_id, connector_data,
+			token, created_at, last_used
+		from refresh_token where last_used < $1;
+	`, lastUsedTime)
+	if err != nil {
+		return nil, fmt.Errorf("query: %v", err)
+	}
+	defer rows.Close()
+
+	var tokens []storage.RefreshToken
+	for rows.Next() {
+		r, err := scanRefresh(rows)
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scan: %v", err)
+	}
+	return tokens, nil
 }
 
 func (c *conn) ListRefreshTokens() ([]storage.RefreshToken, error) {

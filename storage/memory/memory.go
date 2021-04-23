@@ -95,11 +95,22 @@ func (s *memStorage) GarbageCollect(now time.Time, unusedRefreshTokensValidFor t
 				result.DeviceTokens++
 			}
 		}
-		stale_refresh_token_cutoff := now.Add(-unusedRefreshTokensValidFor)
+		staleRefreshTokenCutoff := now.Add(-unusedRefreshTokensValidFor)
 		for id, a := range s.refreshTokens {
-			if stale_refresh_token_cutoff.After(a.LastUsed) {
-				delete(s.refreshTokens, id)
-				result.RefreshTokens++
+			if staleRefreshTokenCutoff.After(a.LastUsed) {
+				// do not delete if this is the primary refresh token linked to offline session
+				o, err := s.GetOfflineSessions(a.Claims.UserID, a.ConnectorID)
+
+				if err != nil {
+					s.logger.Errorf("failed to fetch offline session for user_id %v, connector_id %v: %v", a.Claims.UserID, a.ConnectorID, err)
+				} else {
+					if o.Refresh[a.ClientID].ID == id {
+						s.logger.Debugf("not deleting expired primary refresh token")
+					} else {
+						delete(s.refreshTokens, id)
+						result.RefreshTokens++
+					}
+				}
 			}
 		}
 	})
